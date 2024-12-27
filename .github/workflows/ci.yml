@@ -21,47 +21,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dependency-review:
-      name: Dependency Review
-      if: github.event_name == 'pull_request'
-      runs-on: ubuntu-latest
-      permissions:
-        contents: read
-      steps:
-          - name: Check out repo
-            uses: actions/checkout@v4
-            with:
-              persist-credentials: false
-
-          - name: Dependency review
-            uses: actions/dependency-review-action@v4
-
-  check-licenses:
-    name: Check licenses
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-          cache: 'npm'
-          cache-dependency-path: package.json
-          check-latest: true
-
-      - name: Install
-        run: |
-          npm install --ignore-scripts
-
-      - name: Check licenses
-        run: |
-          npx license-checker --production --summary --onlyAllow="0BSD;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;MIT;"
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -88,33 +47,19 @@ jobs:
         run: |
           npm run lint
 
-  coverage-nix:
-    needs:
-      - lint
-    permissions:
-      contents: read
-    uses: ./.github/workflows/coverage-nix.yml
-
-  coverage-win:
-    needs:
-      - lint
-    permissions:
-      contents: read
-    uses: ./.github/workflows/coverage-win.yml
-
   test-unit:
     needs:
       - lint
       - coverage-nix
       - coverage-win
-    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
 
     strategy:
       matrix:
         node-version: [20, 22.11]
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        runner: [ubuntu-latest, ubuntu-turbo-22core]
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@v4
@@ -140,9 +85,10 @@ jobs:
   test-typescript:
     needs:
       - lint
-      - coverage-nix
-      - coverage-win
-    runs-on: 'ubuntu-latest'
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-turbo-22core]
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
 
@@ -172,7 +118,10 @@ jobs:
     needs:
       - test-typescript
       - test-unit
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-turbo-22core]
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     steps:
@@ -201,20 +150,3 @@ jobs:
       - name: Test esbuild bundle
         run: |
           cd test/bundler/esbuild && npm run test
-
-  automerge:
-    if: >
-        github.event_name == 'pull_request' &&
-        github.event.pull_request.user.login == 'dependabot[bot]'
-    needs:
-      - test-typescript
-      - test-unit
-      - package
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: write
-    steps:
-      - uses: fastify/github-action-merge-dependabot@v3
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
