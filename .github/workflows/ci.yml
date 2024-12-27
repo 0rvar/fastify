@@ -50,8 +50,6 @@ jobs:
   test-unit:
     needs:
       - lint
-      - coverage-nix
-      - coverage-win
     permissions:
       contents: read
 
