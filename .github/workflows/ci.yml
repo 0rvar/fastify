@@ -23,7 +23,10 @@ concurrency:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-turbo-22core]
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     steps:
